@@ -60,29 +60,37 @@ const initializeSocket = (server) => {
 
     socket.on('update-location-captain', async (data) => {
       try {
-        // Validate data before parsing
-        if (!data || typeof data !== 'object') {
-          return socket.emit('error', 'Invalid data format');
-        }
-
-        const { userId, ltd, lng, accuracy } = data;
+        console.log('Received location update:', data);
         
-        if (!userId || !ltd || !lng) {
-          return socket.emit('error', 'Missing required fields');
+        const { userId, latitude, longitude, accuracy } = data;
+        
+        if (!userId || !latitude || !longitude) {
+          return socket.emit('location-update-error', 'Missing required location data');
         }
 
-        await Captain.findByIdAndUpdate(userId, {
-          socketId: socket.id,
-          location: {
-            type: 'Point',
-            coordinates: [lng, ltd],
-            accuracy: accuracy || null
-          }
+        const updatedCaptain = await Captain.findByIdAndUpdate(
+          userId,
+          {
+            socketId: socket.id,
+            location: {
+              type: 'Point',
+              coordinates: [longitude, latitude], // MongoDB expects [longitude, latitude]
+              accuracy: accuracy || null
+            }
+          },
+          { new: true }
+        );
+
+        if (!updatedCaptain) {
+          return socket.emit('location-update-error', 'Captain not found');
+        }
+
+        socket.emit('location-update-success', {
+          coordinates: updatedCaptain.location.coordinates
         });
 
       } catch (error) {
-        console.error("Error updating location:", error);
-        // Don't disconnect on error, just notify
+        console.error('Location update error:', error);
         socket.emit('location-update-error', error.message);
       }
     });

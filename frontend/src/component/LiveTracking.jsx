@@ -4,7 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
-const LiveTracking = ({ pickupLocation, dropLocation, showDirections, isDriver }) => {
+const LiveTracking = ({ pickupLocation, dropLocation, showDirections, isDriver, currentLocation }) => {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const userMarker = useRef(null);
@@ -308,6 +308,33 @@ const LiveTracking = ({ pickupLocation, dropLocation, showDirections, isDriver }
       }
     };
   }, [map.current, mapLoaded, pickupLocation]);
+
+  // Update map when current location changes
+  useEffect(() => {
+    if (!map.current || !mapLoaded || !currentLocation) return;
+
+    // Update user marker
+    if (!userMarker.current) {
+      const el = createCustomMarker('driver');
+      userMarker.current = new mapboxgl.Marker({
+        element: el,
+        pitchAlignment: 'map',
+        rotationAlignment: 'map'
+      })
+        .setLngLat(currentLocation)
+        .addTo(map.current);
+    } else {
+      userMarker.current.setLngLat(currentLocation);
+    }
+
+    // Center map on current location if no route is being shown
+    if (!pickupLocation && !dropLocation) {
+      map.current.easeTo({
+        center: currentLocation,
+        duration: 1000
+      });
+    }
+  }, [currentLocation, mapLoaded]);
 
   // Add custom marker styles
   const createCustomMarker = (type) => {

@@ -82,6 +82,10 @@ const captainSchema = new mongoose.Schema({
       type: Number,
       default: null
     }
+  },
+  isOnline: {
+    type: Boolean,
+    default: false
   }
 });
 

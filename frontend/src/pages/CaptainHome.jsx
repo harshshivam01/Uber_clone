@@ -25,6 +25,7 @@ const CaptainHome = () => {
     destination: null,
     currentLocation: null
   });
+  const [locationWatchId, setLocationWatchId] = useState(null);
 
   console.log("current",currentRequest);
 const navigate = useNavigate();
@@ -77,11 +78,18 @@ const navigate = useNavigate();
 
   // Handle online/offline status
   const handleGoOnline = () => {
-    setIsOnline(prev => !prev);
+    const newStatus = !isOnline;
+    setIsOnline(newStatus);
+    
+    if (!newStatus && locationWatchId) {
+      navigator.geolocation.clearWatch(locationWatchId);
+      setLocationWatchId(null);
+    }
+
     if (socket && isConnected) {
-      sendMessage("captain-status", {
+      sendMessage('captain-status', {
         userId: captainData._id,
-        isOnline: !isOnline
+        isOnline: newStatus
       });
     }
   };
@@ -240,6 +248,78 @@ const getAddressCoordinates = async (address) => {
     console.error('Error fetching coordinates:', error);
     return null;
   }
+};
+
+// Handle location tracking when captain goes online
+useEffect(() => {
+  if (!isOnline || !socket || !isConnected || !captainData?._id) return;
+
+  let watchId = null;
+
+  const startLocationTracking = () => {
+    if (!navigator.geolocation) {
+      console.error('Geolocation not supported');
+      return;
+    }
+
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        
+        // Send location update to server
+        sendMessage('update-location-captain', {
+          userId: captainData._id,
+          latitude,
+          longitude,
+          accuracy
+        });
+
+        // Update local state for map
+        setRideLocations(prev => ({
+          ...prev,
+          currentLocation: [longitude, latitude]
+        }));
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        handleLocationError(error);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 5000
+      }
+    );
+
+    setLocationWatchId(watchId);
+  };
+
+  startLocationTracking();
+
+  // Cleanup function
+  return () => {
+    if (watchId) {
+      navigator.geolocation.clearWatch(watchId);
+    }
+  };
+}, [isOnline, socket, isConnected, captainData]);
+
+// Handle location errors
+const handleLocationError = (error) => {
+  let message = 'Location error occurred';
+  switch (error.code) {
+    case error.PERMISSION_DENIED:
+      message = 'Location permission denied';
+      break;
+    case error.POSITION_UNAVAILABLE:
+      message = 'Location unavailable';
+      break;
+    case error.TIMEOUT:
+      message = 'Location request timed out';
+      break;
+  }
+  console.error(message);
+  // Optionally show error to user
 };
 
   return (
