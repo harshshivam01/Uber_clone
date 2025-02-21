@@ -9,7 +9,7 @@ const initializeSocket = (server) => {
   io = socketIO(server, {
     cors: {
       origin: process.env.NODE_ENV === 'production' 
-        ? "https://uber-clone-ht5p-git-main-harshshivam02s-projects.vercel.app"
+        ? "https://uber-clone-frontend-q5kd.onrender.com"
         : "http://localhost:5173",
       methods: ["GET", "POST"],
       credentials: true // Enable CORS credentials
