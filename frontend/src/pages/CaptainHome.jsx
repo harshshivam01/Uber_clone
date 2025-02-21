@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useContext } from 'react';
 import uberLogo from '../assets/uber-logo.svg';
 import { LogOut, Clock, DollarSign, Route, Car, MapPin, Square, Phone, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import RideRequestPopup from '../component/RideRequestPopup';
 import OtpVerificationPanel from '../component/OtpVerificationPanel';
 import { useNavigate } from 'react-router-dom';
+import {CaptainDataContext} from  '../context/CaptainContext';
+import {useSocket} from '../context/SocketContext';
+import LiveTracking from '../component/LiveTracking';
+
 
 const CaptainHome = () => {
   const [isFocused, setIsFocused] = useState(false);
@@ -14,6 +18,15 @@ const CaptainHome = () => {
   const [rideAccepted, setRideAccepted] = useState(false);
   const [showDefaultView, setShowDefaultView] = useState(false);
   const [showOtpPanel, setShowOtpPanel] = useState(false);
+  const {captainData}=useContext(CaptainDataContext);
+  const {sendMessage,isConnected,socket,receiveMessage}=useSocket();
+  const [rideLocations, setRideLocations] = useState({
+    pickup: null,
+    destination: null,
+    currentLocation: null
+  });
+
+  console.log("current",currentRequest);
 const navigate = useNavigate();
   // Mock data
   const driverStats = {
@@ -30,28 +43,122 @@ const navigate = useNavigate();
     }
   };
 
-  // Show ride request popup after component mounts
-  useEffect(() => {
-    const mockRequest = {
-      pickupLocation: "HSR Layout, Bangalore",
-      destination: "Koramangala, Bangalore",
-      estimatedFare: "250.00",
-      passengerName: "John Doe",
-      passengerRating: "4.8",
-      passengerPhone: "+91 9876543210"
-    };
-    setCurrentRequest(mockRequest);
-    setShowRideRequest(true);
-  }, []);
+  // Add new state for connection status
+  const [isLocationTracking, setIsLocationTracking] = useState(false);
 
+  // Combine socket and location tracking logic
+  useEffect(() => {
+    if (!isConnected || !captainData || !captainData._id) {
+        return;
+    }
+
+    const connectCaptain = () => {
+        console.log('Connecting captain:', captainData._id);
+        sendMessage('join', {
+            userId: captainData._id,
+            userType: 'captain'
+        });
+        setShowDefaultView(true); // Show default view when connecting
+    };
+
+    connectCaptain();
+
+    // Reconnect handler
+    const reconnectInterval = setInterval(() => {
+        if (!isConnected) {
+            connectCaptain();
+        }
+    }, 5000);
+
+    return () => {
+        clearInterval(reconnectInterval);
+    };
+}, [isConnected, captainData, sendMessage]);
+
+  // Handle online/offline status
   const handleGoOnline = () => {
-    setIsOnline(!isOnline);
+    setIsOnline(prev => !prev);
+    if (socket && isConnected) {
+      sendMessage("captain-status", {
+        userId: captainData._id,
+        isOnline: !isOnline
+      });
+    }
   };
 
+ 
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    // Listen for new ride requests
+    const unsubscribeNewRide = receiveMessage('new-ride', (data) => {
+        console.log('New ride request received:', data);
+        if (data && data.ride) {
+            setCurrentRequest({
+                pickupLocation: data.ride.pickup,
+                destination: data.ride.destination,
+                estimatedFare: data.ride.fare,
+                rideId: data.ride.id,
+                status: data.ride.status
+            });
+            setShowRideRequest(true);
+        }
+    });
+
+    
+
+    // Listen for ride acceptance confirmation
+    const handleRideAcceptConfirmed = async (data) => {
+        console.log('Ride acceptance confirmed:', data);
+        setShowRideRequest(false);
+        
+        // Get coordinates for pickup and destination
+        const [pickupCoords, destinationCoords] = await Promise.all([
+          getAddressCoordinates(data.ride.pickup),
+          getAddressCoordinates(data.ride.destination)
+        ]);
+    
+        setRideLocations({
+          pickup: pickupCoords,
+          destination: destinationCoords,
+          currentLocation: null // This will be updated by location tracking
+        });
+    
+        setCurrentRequest({
+          ...currentRequest,
+          rideId: data.ride.id,
+          pickupLocation: data.ride.pickup,
+          destination: data.ride.destination,
+          estimatedFare: data.ride.fare,
+          passengerName: `${data.user.fullname.firstname} ${data.user.fullname.lastname}`,
+          passengerRating: data.user.rating || "N/A",
+          passengerPhone: data.user.phoneNumber,
+          rideStatus: 'accepted'
+        });
+        setRideAccepted(true);
+        setShowDefaultView(false);
+      };
+    
+    socket.on('ride-accept-confirmed', handleRideAcceptConfirmed);
+    socket.on('ride-accept-error', (error) => {
+        console.error('Error accepting ride:', error);
+        setShowRideRequest(false);
+    });
+
+    return () => {
+        unsubscribeNewRide();
+        socket.off('ride-accept-confirmed');
+        socket.off('ride-accept-error');
+    };
+}, [socket, isConnected, receiveMessage]);
+
   const handleAcceptRide = () => {
-    setShowRideRequest(false);
-    setRideAccepted(true);
-    setShowDefaultView(false);
+    if (currentRequest && socket && isConnected) {
+        sendMessage('accept-ride', {
+            rideId: currentRequest.rideId,
+            captainId: captainData._id
+        });
+    }
   };
 
   const handleDeclineRide = () => {
@@ -60,24 +167,90 @@ const navigate = useNavigate();
   };
 
   const handleStartRide = () => {
+    console.log('Starting ride with ID:', currentRequest?.rideId);
+    if (!currentRequest?.rideId) {
+        console.error('No ride ID available');
+        return;
+    }
     setShowOtpPanel(true);
-  };
+};
 
   const handleOtpVerify = (success) => {
     if (success) {
-      setShowOtpPanel(false);
-      navigate('/captain-ridestarted');
+        // Store current ride details in localStorage
+        localStorage.setItem('currentCaptainRide', JSON.stringify(currentRequest));
+        setShowOtpPanel(false);
+        navigate('/captain-ridestarted');
     }
+};
+
+// Add socket listener for ride start
+useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const handleRideStarted = (data) => {
+        console.log('Ride started:', data);
+        // Store the updated ride data
+        localStorage.setItem('currentCaptainRide', JSON.stringify({
+            rideId: data.ride.id,
+            pickup: data.ride.pickup,
+            destination: data.ride.destination,
+            estimatedFare: data.ride.fare,
+            passengerName: data.ride.passenger.name,
+            passengerRating: data.ride.passenger.rating,
+            passengerPhone: data.ride.passenger.phoneNumber,
+            status: data.ride.status
+        }));
+    };
+
+    socket.on('ride-started', handleRideStarted);
+
+    return () => {
+        socket.off('ride-started');
+    };
+}, [socket, isConnected]);
+
+useEffect(() => {
+  if (!socket || !isConnected) return;
+
+  socket.on('ride-cancelled', (data) => {
+    console.log('Ride cancelled:', data);
+    setShowRideRequest(false);
+    setRideAccepted(false);
+    setCurrentRequest(null);
+    setShowDefaultView(true);
+  });
+
+  return () => {
+    socket.off('ride-cancelled');
   };
+}, [socket, isConnected]);
+
+const getAddressCoordinates = async (address) => {
+  try {
+    const response = await fetch(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${import.meta.env.VITE_MAPBOX_TOKEN}`
+    );
+    const data = await response.json();
+    if (data.features && data.features.length > 0) {
+      return data.features[0].center;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching coordinates:', error);
+    return null;
+  }
+};
 
   return (
     <div className="relative h-screen">
       {/* Background Map */}
       <div className="absolute inset-0">
-        <img
-          src="https://s.wsj.net/public/resources/images/BN-XR452_201802_M_20180228165525.gif"
-          alt="Live Map"
-          className="w-full h-full object-cover"
+        <LiveTracking
+          pickupLocation={rideLocations.pickup}
+          dropLocation={rideLocations.destination}
+          showDirections={rideAccepted}
+          isDriver={true}
         />
       </div>
 
@@ -169,75 +342,70 @@ const navigate = useNavigate();
               </div>
             </div>
             <div className="flex gap-2">
-              <button className="p-2 rounded-full bg-blue-100 text-blue-600">
-                <MessageCircle size={24} />
-              </button>
-              <button className="p-2 rounded-full bg-green-100 text-green-600">
+              <a href={`tel:${currentRequest.passengerPhone}`} className="p-2 rounded-full bg-green-100 text-green-600">
                 <Phone size={24} />
-              </button>
+              </a>
+            </div>
+          </div>
+          
+          <div className="bg-gray-50 p-4 rounded-lg mb-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-gray-600">Passenger</p>
+                <p className="font-semibold text-lg">{currentRequest.passengerName}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-gray-600">Rating</p>
+                <p className="font-semibold">{currentRequest.passengerRating}⭐</p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Route Details */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <MapPin className="text-green-600" size={24} />
+              <div>
+                <p className="text-gray-600">Pickup</p>
+                <p className="font-semibold">{currentRequest?.pickupLocation}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Square className="text-red-600" size={24} />
+              <div>
+                <p className="text-gray-600">Destination</p>
+                <p className="font-semibold">{currentRequest?.destination}</p>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-4">
-            {/* Passenger Details */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-gray-600">Passenger</p>
-                  <p className="font-semibold text-lg">{currentRequest?.passengerName}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-gray-600">Rating</p>
-                  <p className="font-semibold">{currentRequest?.passengerRating}⭐</p>
-                </div>
+          {/* Fare Details */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-gray-600">Estimated Fare</p>
+                <p className="font-semibold text-lg">₹{currentRequest?.estimatedFare}</p>
               </div>
+              <p className="text-gray-600">Cash Payment</p>
             </div>
-
-            {/* Route Details */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <MapPin className="text-green-600" size={24} />
-                <div>
-                  <p className="text-gray-600">Pickup</p>
-                  <p className="font-semibold">{currentRequest?.pickupLocation}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Square className="text-red-600" size={24} />
-                <div>
-                  <p className="text-gray-600">Destination</p>
-                  <p className="font-semibold">{currentRequest?.destination}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Fare Details */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-gray-600">Estimated Fare</p>
-                  <p className="font-semibold text-lg">₹{currentRequest?.estimatedFare}</p>
-                </div>
-                <p className="text-gray-600">Cash Payment</p>
-              </div>
-            </div>
-
-            {/* Start Ride Button */}
-            <button
-              onClick={handleStartRide}
-              className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
-            >
-              Start Ride
-            </button>
           </div>
+
+          {/* Start Ride Button */}
+          <button
+            onClick={handleStartRide}
+            className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+          >
+            Start Ride
+          </button>
         </div>
       )}
 
       {/* OTP Verification Panel */}
-      {showOtpPanel && (
+      {showOtpPanel && currentRequest?.rideId && (
         <OtpVerificationPanel
-          onVerify={handleOtpVerify}
-          onClose={() => setShowOtpPanel(false)}
+            onVerify={handleOtpVerify}
+            rideId={currentRequest.rideId}
+            onClose={() => setShowOtpPanel(false)}
         />
       )}
     </div>

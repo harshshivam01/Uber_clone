@@ -40,7 +40,7 @@ const captainSchema = new mongoose.Schema({
    status:{
     type:String,
     enum:["active","inactive"],
-    default:"inactive",
+    default:"active",
    },
    vehicle:{
     color:{
@@ -67,17 +67,22 @@ const captainSchema = new mongoose.Schema({
     },
 
    },
-   location:{
-    longitude:{
-        type:Number,
-      
+   location: {
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point'
     },
-    latitude:{
-        type:Number,
-         
+    coordinates: {
+      type: [Number],  // [longitude, latitude]
+      required: true,
+      default: [0, 0]
     },
-   }
-
+    accuracy: {
+      type: Number,
+      default: null
+    }
+  }
 });
 
 captainSchema.methods.generateAuthToken = function () {
@@ -92,6 +97,8 @@ captainSchema.statics.hashedPassword = async function (password) {
 captainSchema.methods.comparePassword = async function (password) {
     return await bcrypt.compare(password, this.password);
 };
+
+captainSchema.index({ location: '2dsphere' });
 
 const captain = mongoose.model("captain", captainSchema);
 

@@ -7,12 +7,14 @@ const jwt=require('jsonwebtoken');
 module.exports.authUser=async(req,res,next)=>{
     console.log(req.cookies)
     const token = req?.cookies.token||req.headers.authorization?.split(' ')[1];
-    console.log(token);
+    console.log('tooken',token);
 
     if(!token){
         return res.status(401).json({message:"unauthorized"});
     }
+
     try{
+        console.log(token);
        
 
         // const token=req.header('Authorization').replace('Bearer ','');

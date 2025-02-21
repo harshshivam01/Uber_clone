@@ -2,28 +2,28 @@ import React from 'react';
 import { UserRound } from 'lucide-react';
 import ubergo from '../assets/ubergo.png';
 
-const ConfirmVehicle = ({ onSelect }) => {
+const ConfirmVehicle = ({ onSelect, fareDetails }) => {
   const vehicles = [
     {
       id: 1,
       name: 'Uber Moto',
+      type: 'moto',
       image: 'https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1649231091/assets/2c/7fa194-c954-49b2-9c6d-a3b8601370f5/original/Uber_Moto_Orange_312x208_pixels_Mobile.png',
-      capacity: 1,
-      price: '₹190.00'
+      capacity: 1
     },
     {
       id: 2,
       name: 'Uber Go',
+      type: 'car',
       image: ubergo,
-      capacity: 4,
-      price: '₹400.00'
+      capacity: 4
     },
     {
       id: 3,
       name: 'Uber Auto',
+      type: 'auto',
       image: 'https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648431773/assets/1d/db8c56-0204-4ce4-81ce-56a11a07fe98/original/Uber_Auto_558x372_pixels_Desktop.png',
-      capacity: 3,
-      price: '₹300.00'
+      capacity: 3
     }
   ];
 
@@ -35,7 +35,7 @@ const ConfirmVehicle = ({ onSelect }) => {
         {vehicles.map((vehicle) => (
           <div
             key={vehicle.id}
-            onClick={() => onSelect(vehicle)}
+            onClick={() => onSelect({...vehicle, price: fareDetails?.[vehicle.type]})}
             className="flex justify-between bg-gray-100 p-4 rounded-lg items-center border-2 border-gray-300 hover:border-black transition-all cursor-pointer"
           >
             <img
@@ -53,7 +53,9 @@ const ConfirmVehicle = ({ onSelect }) => {
               </div>
               <p className="text-sm text-gray-600">Get a ride</p>
             </div>
-            <h4 className="text-xl font-semibold">{vehicle.price}</h4>
+            <h4 className="text-xl font-semibold">
+              {fareDetails ? `₹${fareDetails[vehicle.type]}` : 'Loading...'}
+            </h4>
           </div>
         ))}
       </div>

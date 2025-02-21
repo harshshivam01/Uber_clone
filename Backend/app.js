@@ -7,6 +7,7 @@ const userRouter=require('./routes/user.routes');
 const captainRouter=require('./routes/captain.routes');
 const cookieParser=require('cookie-parser');
 const mapRouter = require('./routes/maps.route');
+const rideRoutes = require('./routes/ride.routes');
 
 
 
@@ -19,6 +20,7 @@ connectDb("uber");
 app.use('/api/user', userRouter);
 app.use('/api/captain', captainRouter);
 app.use('/api/maps', mapRouter);
+app.use('/api/ride', rideRoutes);
 
 
 
