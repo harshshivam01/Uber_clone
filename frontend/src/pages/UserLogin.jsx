@@ -8,28 +8,32 @@ const UserLogin = () => {
  
   const navigate=useNavigate() ;
 
-  const submithandler =async (e) => {
+  const submithandler = async (e) => {
     e.preventDefault();
-   try{
-   const newUser= {
-      email: email,
-      password: password,
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/api/user/login`,
+        {
+          email: email,
+          password: password,
+        },
+        {
+          withCredentials: true, // Enable credentials
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      console.log(response.data);
+      localStorage.setItem('token', response.data.token);
+      navigate('/home');
+    } catch (error) {
+      console.error('Login error:', error);
+      alert(error.response?.data?.message || 'Login failed. Please try again.');
     }
-    const response = await axios.post(`${import.meta.env.VITE_BASE_URL}/api/user/login`,newUser)
-    console.log(response.data);
-    localStorage.setItem('token',response.data.token);
-    navigate('/home');
-
-   }catch(error){
-      console.log(error);
-   }
-   finally{
-    setEmail('')
-    setPassword('')
-   }
-    
-   
-  }
+  };
+  
   return (
     <div className="p-7 flex flex-col justify-between h-screen">
       <div>

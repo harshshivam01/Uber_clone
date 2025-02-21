@@ -16,7 +16,7 @@ const SocketProvider = ({ children }) => {
         const SOCKET_URL = import.meta.env.VITE_BASE_URL;
         
         const socketInstance = io(SOCKET_URL, {
-            transports: ['websocket'],
+            transports: ['websocket', 'polling'], // Add polling as fallback
             reconnection: true,
             reconnectionAttempts: 5,
             reconnectionDelay: 1000,
@@ -24,7 +24,8 @@ const SocketProvider = ({ children }) => {
             autoConnect: true,
             auth: {
                 token: localStorage.getItem('token')
-            }
+            },
+            withCredentials: true // Enable CORS credentials
         });
 
         socketInstance.on('connect', () => {
@@ -49,7 +50,7 @@ const SocketProvider = ({ children }) => {
         });
 
         socketInstance.on('connect_error', (error) => {
-            console.error('⚠️ Connection error:', error);
+            console.error('Socket connection error:', error);
             setIsConnected(false);
         });
 

@@ -8,8 +8,11 @@ let io;
 const initializeSocket = (server) => {
   io = socketIO(server, {
     cors: {
-      origin: "*",
-      methods: ["GET", "POST"]
+      origin: process.env.NODE_ENV === 'production' 
+        ? "https://uber-clone-ht5p-git-main-harshshivam02s-projects.vercel.app"
+        : "http://localhost:5173",
+      methods: ["GET", "POST"],
+      credentials: true // Enable CORS credentials
     },
     pingTimeout: 120000, // Increase ping timeout to 2 minutes
     pingInterval: 25000, // Add ping interval
