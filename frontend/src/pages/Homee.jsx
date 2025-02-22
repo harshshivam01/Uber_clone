@@ -46,46 +46,45 @@ const Homee = () => {
   useEffect(() => {
     if (!socket || !isConnected) return;
 
-    // Listen for ride acceptance from captain
     const handleRideAccepted = (data) => {
       console.log('Ride accepted by captain:', data);
+      
       if (!data || !data.ride || !data.captain) {
         console.error('Invalid ride acceptance data received');
         return;
       }
 
-      // Immediately update ride status to 'matched'
+      // Immediately update ride status
       setRideStatus('matched');
-      
-      // Update the ride details with captain information
+
       const rideDetails = {
         id: data.ride.id,
         pickup: data.ride.pickup,
         destination: data.ride.destination,
         fare: data.ride.fare,
-        status: 'matched', // Explicitly set status
+        status: 'matched',
         otp: data.ride.otp,
         captain: {
           id: data.captain.id,
-          name: data.captain.fullname,
+          name: data.captain.fullname, // Already formatted name from backend
           phoneNumber: data.captain.phoneNumber,
-          vehicle: data.captain.vehicle
+          vehicle: data.captain.vehicle,
+          rating: data.captain.rating
         }
       };
 
-      // Store ride details for the driver panel
+      // Store ride details and immediately update UI
       localStorage.setItem('currentRide', JSON.stringify(rideDetails));
-      
-      // Log to verify data
       console.log('Updated ride details:', rideDetails);
     };
 
     socket.on('ride-accepted', handleRideAccepted);
-
+    
     return () => {
       socket.off('ride-accepted');
     };
   }, [socket, isConnected]);
+
 useEffect(()=>{
   if(!socket || !isConnected) return
 
@@ -277,7 +276,7 @@ useEffect(() => {
       />
 
       {/* Background Image - Always visible */}
-      <div className="h-screen w-screen" onClick={handleMapClick}>
+      <div className="h-screen w-screen inset-0" onClick={handleMapClick}>
         <LiveTracking 
           pickupLocation={coordinates.pickup}
           dropLocation={coordinates.destination}
@@ -289,16 +288,16 @@ useEffect(() => {
         <div 
           className={`bg-white absolute w-full transition-all duration-300 ${
             isMapFocused 
-              ? "top-[70%]" 
+              ? "top-[20%]" 
               : activeField 
                 ? "top-0 h-screen" 
-                : "top-[70%]"
+                : "top-[60%]"
           }`}
           onClick={handlePanelClick}
         >
           <div className="panel-drag-handle" />
-          <div className={`${activeField ? 'h-screen p-2' : 'h-[40%]'}`}>
-            <h4 className="font-semibold text-3xl mt-10 bg-white p-2">Find a trip</h4>
+          <div className={`${activeField ? 'h-screen p-2' : 'h-[60%]'}`}>
+            <h4 className="font-semibold text-3xl  bg-white p-2">Find a trip</h4>
 
             <form className="p-2 flex flex-col gap-4 max-w-md mx-auto " onSubmit={handleSearchSubmit}>
               <div className="relative w-full">

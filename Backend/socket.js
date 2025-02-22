@@ -104,11 +104,12 @@ const initializeSocket = (server) => {
           rideId,
           {
             captainId: captainId,
-            status: 'matched' // Change from 'accepted' to 'matched'
+            status: 'matched'
           },
           { new: true }
         )
         .populate('userId')
+        .populate('captainId') 
         .select('+otp');
 
         if (!updatedRide) {
@@ -116,54 +117,28 @@ const initializeSocket = (server) => {
         }
 
         const captain = await Captain.findById(captainId);
-        const user = await User.findById(updatedRide.userId);
-
-        if (!captain || !user) {
-          return socket.emit('ride-accept-error', 'User or Captain not found');
-        }
-
-        // Emit to user
-        if (user.socketId) {
-          io.to(user.socketId).emit('ride-accepted', {
+        
+        // Emit to user with complete captain details
+        if (updatedRide.userId.socketId) {
+          io.to(updatedRide.userId.socketId).emit('ride-accepted', {
             ride: {
               id: updatedRide._id.toString(),
               pickup: updatedRide.pickup,
               destination: updatedRide.destination,
               fare: updatedRide.fare,
-              status: 'matched', // Explicitly set status
+              status: 'matched',
               otp: updatedRide.otp
             },
             captain: {
               id: captain._id,
               fullname: `${captain.fullname.firstname} ${captain.fullname.lastname}`,
+              phoneNumber: captain.phoneNumber,
               vehicle: captain.vehicle,
-              rating: captain.rating,
-              phoneNumber: captain.phoneNumber
+              rating: captain.rating
             }
           });
         }
-
-        // Confirm to captain
-        socket.emit('ride-accept-confirmed', {
-          ride: {
-            id: updatedRide._id.toString(), // Convert to string
-            pickup: updatedRide.pickup,
-            destination: updatedRide.destination,
-            fare: updatedRide.fare,
-            status: updatedRide.status
-          },
-          user: {
-            fullname: {
-              firstname: user.fullname.firstname,
-              lastname: user.fullname.lastname
-            },
-            rating: user.rating,
-            phoneNumber: user.phoneNumber
-          }
-        });
-
       } catch (error) {
-        console.error('Error accepting ride:', error);
         socket.emit('ride-accept-error', error.message);
       }
     });

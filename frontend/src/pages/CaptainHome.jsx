@@ -167,6 +167,10 @@ const navigate = useNavigate();
             captainId: captainData._id
         });
     }
+    setRideAccepted(true);
+    setShowDefaultView(false);
+    setShowRideRequest(false);
+
   };
 
   const handleDeclineRide = () => {

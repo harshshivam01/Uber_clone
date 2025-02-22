@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserRound } from 'lucide-react';
-import ubergo from '../assets/ubergo.png';
+import ubergo from '../assets/ubergo.svg';
 
 const ConfirmVehicle = ({ onSelect, fareDetails }) => {
   const vehicles = [
@@ -15,7 +15,7 @@ const ConfirmVehicle = ({ onSelect, fareDetails }) => {
       id: 2,
       name: 'Uber Go',
       type: 'car',
-      image: ubergo,
+      image: 'https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_585,w_550/v1597151125/assets/cb/c5b75b-5b9e-4ba9-9708-d10f27e7242a/original/Comfort.jpg',
       capacity: 4
     },
     {
@@ -41,7 +41,7 @@ const ConfirmVehicle = ({ onSelect, fareDetails }) => {
             <img
               src={vehicle.image}
               alt={vehicle.name}
-              className="w-20 object-contain"
+              className="w-20 object-cover"
             />
             <div>
               <div className="flex items-center gap-2">
