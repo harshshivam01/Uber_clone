@@ -261,7 +261,7 @@ useEffect(() => {
 
   let watchId = null;
   let intervalId = null;
-  const MIN_ACCURACY_THRESHOLD = 100;
+  const MIN_ACCURACY_THRESHOLD = 250;
   const UPDATE_INTERVAL = 10000; // 10 seconds in milliseconds
   let latestPosition = null;
 
