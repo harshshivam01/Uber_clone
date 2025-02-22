@@ -259,72 +259,82 @@ useEffect(() => {
   if (!isOnline || !socket || !isConnected || !captainData?._id) return;
 
   let watchId = null;
+  let intervalId = null;
+  const MIN_ACCURACY_THRESHOLD = 100;
+  const UPDATE_INTERVAL = 10000; // 10 seconds in milliseconds
+  let latestPosition = null;
+
+  const GEOLOCATION_OPTIONS = {
+    enableHighAccuracy: true,
+    timeout: 30000,
+    maximumAge: 10000
+  };
+
+  const updateLocation = () => {
+    if (latestPosition && latestPosition.coords.accuracy <= MIN_ACCURACY_THRESHOLD) {
+      const { latitude, longitude, accuracy } = latestPosition.coords;
+
+      sendMessage('update-location-captain', {
+        userId: captainData._id,
+        latitude,
+        longitude,
+        accuracy
+      });
+
+      setRideLocations((prev) => ({
+        ...prev,
+        currentLocation: [longitude, latitude]
+      }));
+    }
+  };
 
   const startLocationTracking = () => {
     if (!navigator.geolocation) {
-      console.error('Geolocation not supported');
+      console.error('Geolocation is not supported by this browser.');
       return;
     }
 
     watchId = navigator.geolocation.watchPosition(
       (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        
-        // Send location update to server
-        sendMessage('update-location-captain', {
-          userId: captainData._id,
-          latitude,
-          longitude,
-          accuracy
-        });
-
-        // Update local state for map
-        setRideLocations(prev => ({
-          ...prev,
-          currentLocation: [longitude, latitude]
-        }));
+        console.log(
+          `Location received - Latitude: ${position.coords.latitude}, Longitude: ${position.coords.longitude}, Accuracy: ${position.coords.accuracy}m`
+        );
+        latestPosition = position;
       },
       (error) => {
-        console.error('Geolocation error:', error);
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            console.error('User denied the request for Geolocation.');
+            break;
+          case error.POSITION_UNAVAILABLE:
+            console.error('Location information is unavailable.');
+            break;
+          case error.TIMEOUT:
+            console.error('The request to get user location timed out.');
+            break;
+          default:
+            console.error('An unknown geolocation error occurred:', error);
+            break;
+        }
         handleLocationError(error);
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 5000
-      }
+      GEOLOCATION_OPTIONS
     );
+
+    // Ensure location is sent every 10 seconds
+    intervalId = setInterval(updateLocation, UPDATE_INTERVAL);
 
     setLocationWatchId(watchId);
   };
 
   startLocationTracking();
 
-  // Cleanup function
   return () => {
-    if (watchId) {
-      navigator.geolocation.clearWatch(watchId);
-    }
+    if (watchId) navigator.geolocation.clearWatch(watchId);
+    if (intervalId) clearInterval(intervalId);
   };
 }, [isOnline, socket, isConnected, captainData]);
 
-// Handle location errors
-const handleLocationError = (error) => {
-  let message = 'Location error occurred';
-  switch (error.code) {
-    case error.PERMISSION_DENIED:
-      message = 'Location permission denied';
-      break;
-    case error.POSITION_UNAVAILABLE:
-      message = 'Location unavailable';
-      break;
-    case error.TIMEOUT:
-      message = 'Location request timed out';
-      break;
-  }
-  console.error(message);
-  // Optionally show error to user
-};
 
   return (
     <div className="relative h-screen">
