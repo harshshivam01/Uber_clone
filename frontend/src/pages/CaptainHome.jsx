@@ -110,6 +110,7 @@ const navigate = useNavigate();
                 status: data.ride.status
             });
             setShowRideRequest(true);
+
         }
     });
 
@@ -273,13 +274,14 @@ useEffect(() => {
   const updateLocation = () => {
     if (latestPosition && latestPosition.coords.accuracy <= MIN_ACCURACY_THRESHOLD) {
       const { latitude, longitude, accuracy } = latestPosition.coords;
-
+if(accuracy<=MIN_ACCURACY_THRESHOLD){
       sendMessage('update-location-captain', {
         userId: captainData._id,
         latitude,
         longitude,
         accuracy
       });
+    }
 
       setRideLocations((prev) => ({
         ...prev,
@@ -316,7 +318,7 @@ useEffect(() => {
             console.error('An unknown geolocation error occurred:', error);
             break;
         }
-        handleLocationError(error);
+       
       },
       GEOLOCATION_OPTIONS
     );

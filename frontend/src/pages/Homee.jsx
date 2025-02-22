@@ -276,7 +276,7 @@ useEffect(() => {
       />
 
       {/* Background Image - Always visible */}
-      <div className="h-screen w-screen inset-0" onClick={handleMapClick}>
+      <div className="h-screen w-screen inset-0" >
         <LiveTracking 
           pickupLocation={coordinates.pickup}
           dropLocation={coordinates.destination}
